@@ -1,5 +1,6 @@
 package org.example.alertsystemfrontend.ui;
 
+import javafx.beans.Observable;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
@@ -10,6 +11,7 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Window;
 
 import org.example.alertsystemfrontend.model.AlertContact;
+import org.example.alertsystemfrontend.model.ChangeTracker;
 import org.example.alertsystemfrontend.model.Company;
 import org.example.alertsystemfrontend.network.BackendClient;
 import org.example.alertsystemfrontend.network.SocketBackendClient;
@@ -35,6 +37,19 @@ public class AlertSystemController {
 
     private final ObservableList<Company> companies = FXCollections.observableArrayList();
     private final ObservableList<AlertContact> alertContacts = FXCollections.observableArrayList();
+
+    // True from the moment a company/contact is added, removed, or edited, until the next
+    // successful "שלח עדכון" (see onSubmitUpdate/sendWithLoading, which calls markClean() on
+    // success). Passed to BackendClient.sendUpdate() so the network layer knows which list(s)
+    // actually have new data to send.
+    private final ChangeTracker<Company> companiesChangeTracker = new ChangeTracker<>(companies, company ->
+            new Observable[]{
+                    company.nameProperty(), company.companyIdProperty(),
+                    company.peopleImpressionProperty(), company.financialImpressionProperty(),
+                    company.unpaidMonthsProperty(), company.getComments()
+            });
+    private final ChangeTracker<AlertContact> alertContactsChangeTracker = new ChangeTracker<>(alertContacts,
+            contact -> new Observable[]{contact.nameProperty(), contact.emailProperty()});
 
     // Swap this for a different BackendClient (e.g. a fake one) if you ever want to test the UI
     // without a real backend connection.
@@ -80,9 +95,16 @@ public class AlertSystemController {
             Dialogs.showValidationErrors(owner, errors);
             return;
         }
-        sendWithLoading(owner, () -> backendClient.sendUpdate(companies, alertContacts),
+        boolean companiesChanged = companiesChangeTracker.isChanged();
+        boolean alertContactsChanged = alertContactsChangeTracker.isChanged();
+        sendWithLoading(owner,
+                () -> backendClient.sendUpdate(companies, companiesChanged, alertContacts, alertContactsChanged),
                 "העדכון נשלח בהצלחה לשרת.",
-                "שליחת העדכון לשרת נכשלה. נסה שוב מאוחר יותר.");
+                "שליחת העדכון לשרת נכשלה. נסה שוב מאוחר יותר.",
+                () -> {
+                    companiesChangeTracker.markClean();
+                    alertContactsChangeTracker.markClean();
+                });
     }
 
     private List<String> validateAll() {
@@ -124,6 +146,11 @@ public class AlertSystemController {
     }
 
     private void sendWithLoading(Window owner, Callable<Boolean> action, String successMessage, String failureMessage) {
+        sendWithLoading(owner, action, successMessage, failureMessage, null);
+    }
+
+    private void sendWithLoading(Window owner, Callable<Boolean> action, String successMessage,
+                                  String failureMessage, Runnable onSuccess) {
         showLoading();
 
         Task<Boolean> sendTask = new Task<>() {
@@ -134,7 +161,11 @@ public class AlertSystemController {
         };
         sendTask.setOnSucceeded(e -> {
             hideLoading();
-            Dialogs.showResultDialog(owner, sendTask.getValue(), successMessage, failureMessage);
+            boolean success = sendTask.getValue();
+            if (success && onSuccess != null) {
+                onSuccess.run();
+            }
+            Dialogs.showResultDialog(owner, success, successMessage, failureMessage);
         });
         sendTask.setOnFailed(e -> {
             hideLoading();

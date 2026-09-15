@@ -12,5 +12,9 @@ public interface BackendClient {
 
     boolean sendHistoricalCheckRequest(Company company) throws Exception;
 
-    boolean sendUpdate(List<Company> companies, List<AlertContact> alertContacts) throws Exception;
+    // companiesChanged/alertContactsChanged say which list has additions, removals, or edited
+    // items since the last successful sendUpdate() call (see model.ChangeTracker) - use them to
+    // decide whether a list needs sending at all, or to send a partial vs. full payload.
+    boolean sendUpdate(List<Company> companies, boolean companiesChanged,
+                        List<AlertContact> alertContacts, boolean alertContactsChanged) throws Exception;
 }
