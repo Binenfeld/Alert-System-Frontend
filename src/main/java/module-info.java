@@ -1,6 +1,7 @@
 module org.example.alertsystemfrontend {
     requires javafx.controls;
     requires javafx.fxml;
+    requires com.google.gson;
 
     opens org.example.alertsystemfrontend.ui to javafx.fxml;
 
