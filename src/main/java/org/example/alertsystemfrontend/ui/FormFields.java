@@ -1,15 +1,20 @@
 package org.example.alertsystemfrontend.ui;
 
+import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
 import javafx.geometry.Pos;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 
-import org.example.alertsystemfrontend.model.ImpressionLevels;
+import org.example.alertsystemfrontend.model.ImpressionLevel;
 
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.function.Predicate;
 
 // Shared "label: field" row builders used by the list cells and the dialogs, so the same
@@ -40,13 +45,13 @@ public final class FormFields {
         return box;
     }
 
-    public static HBox labeledCombo(String labelText, StringProperty value) {
-        ComboBox<String> combo = impressionCombo();
+    public static HBox labeledCombo(String labelText, ObjectProperty<ImpressionLevel> value) {
+        ComboBox<ImpressionLevel> combo = impressionCombo();
         combo.valueProperty().bindBidirectional(value);
         return labeledCombo(labelText, combo);
     }
 
-    public static HBox labeledCombo(String labelText, ComboBox<String> combo) {
+    public static HBox labeledCombo(String labelText, ComboBox<ImpressionLevel> combo) {
         HBox box = new HBox(8);
         box.setAlignment(Pos.CENTER_RIGHT);
         Label label = new Label(labelText);
@@ -56,11 +61,47 @@ public final class FormFields {
         return box;
     }
 
-    public static ComboBox<String> impressionCombo() {
-        ComboBox<String> combo = new ComboBox<>(ImpressionLevels.OPTIONS);
+    // Stoplight coloring for the impression combo: greener the better the impression, redder the
+    // worse -- one CSS class per level (see .impression-combo .list-cell.impression-cell-* in
+    // alert-system-view.css), applied to both the popup's list cells and the button cell (the
+    // control's own always-visible "selected value" area) so the color shows whether the dropdown
+    // is open or not.
+    private static final Map<ImpressionLevel, String> IMPRESSION_STYLE_CLASSES = new EnumMap<>(ImpressionLevel.class);
+
+    static {
+        IMPRESSION_STYLE_CLASSES.put(ImpressionLevel.GREAT, "impression-cell-great");
+        IMPRESSION_STYLE_CLASSES.put(ImpressionLevel.GOOD, "impression-cell-good");
+        IMPRESSION_STYLE_CLASSES.put(ImpressionLevel.OKAY, "impression-cell-okay");
+        IMPRESSION_STYLE_CLASSES.put(ImpressionLevel.BAD, "impression-cell-bad");
+    }
+
+    public static ComboBox<ImpressionLevel> impressionCombo() {
+        ComboBox<ImpressionLevel> combo = new ComboBox<>(FXCollections.observableArrayList(ImpressionLevel.values()));
         combo.getStyleClass().add("impression-combo");
         combo.setMaxWidth(Double.MAX_VALUE);
+        // HBox.setHgrow only controls how *extra* space is handed out -- it does nothing to let a
+        // child shrink below its own default min width. Without this, a row's true required width
+        // (labels + buttons + this control's default min width) can exceed the card's available
+        // width without JavaFX showing it until a later relayout (e.g. the one triggered by
+        // clicking the row to select it) finally reveals a horizontal scrollbar.
+        combo.setMinWidth(60);
+        combo.setCellFactory(list -> new ImpressionListCell());
+        combo.setButtonCell(new ImpressionListCell());
         return combo;
+    }
+
+    private static final class ImpressionListCell extends ListCell<ImpressionLevel> {
+        @Override
+        protected void updateItem(ImpressionLevel item, boolean empty) {
+            super.updateItem(item, empty);
+            getStyleClass().removeAll(IMPRESSION_STYLE_CLASSES.values());
+            if (empty || item == null) {
+                setText(null);
+            } else {
+                setText(item.toString());
+                getStyleClass().add(IMPRESSION_STYLE_CLASSES.get(item));
+            }
+        }
     }
 
     private static TextField buildTextField(String prompt, StringProperty value) {
@@ -68,6 +109,7 @@ public final class FormFields {
         field.setPromptText(prompt);
         field.getStyleClass().add("text-field");
         field.textProperty().bindBidirectional(value);
+        field.setMinWidth(60);
         return field;
     }
 }

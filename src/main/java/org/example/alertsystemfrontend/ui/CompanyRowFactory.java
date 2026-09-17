@@ -1,37 +1,39 @@
 package org.example.alertsystemfrontend.ui;
 
+import javafx.collections.ObservableList;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.stage.Window;
 
 import org.example.alertsystemfrontend.model.Company;
 import org.example.alertsystemfrontend.validation.Validation;
 
-public class CompanyListCell extends ListCell<Company> {
+import java.util.function.Supplier;
 
-    @Override
-    protected void updateItem(Company company, boolean empty) {
-        super.updateItem(company, empty);
-        setText(null);
-        setGraphic(empty || company == null ? null : buildRow(company));
+// Builds one row for a Company. Plain factory, not a ListCell -- the companies list is a simple
+// VBox (see AlertSystemController), not a virtualized ListView, since these rows never needed
+// selection and a small VBox has none of ListView's virtualization quirks.
+public final class CompanyRowFactory {
+
+    private CompanyRowFactory() {
     }
 
-    private HBox buildRow(Company company) {
+    public static HBox buildRow(Company company, ObservableList<Company> companies, Supplier<Window> ownerSupplier) {
         HBox row = new HBox(10);
         row.getStyleClass().add("row");
         row.setAlignment(Pos.CENTER_LEFT);
 
         Button deleteBtn = new Button("מחק");
         deleteBtn.getStyleClass().addAll("btn-secondary", "small");
-        deleteBtn.setOnAction(e -> getListView().getItems().remove(company));
+        deleteBtn.setOnAction(e -> companies.remove(company));
 
         Button commentsBtn = new Button("הערות");
         commentsBtn.getStyleClass().addAll("btn-secondary", "small");
-        commentsBtn.setOnAction(e -> Dialogs.showCompanyCommentsDialog(getListView().getScene().getWindow(), company));
+        commentsBtn.setOnAction(e -> Dialogs.showCompanyCommentsDialog(ownerSupplier.get(), company));
 
         VBox buttons = new VBox(6, deleteBtn, commentsBtn);
 
@@ -51,7 +53,7 @@ public class CompanyListCell extends ListCell<Company> {
         return row;
     }
 
-    private HBox createUnpaidMonthsRow(Company company) {
+    private static HBox createUnpaidMonthsRow(Company company) {
         HBox box = new HBox(8);
         box.setAlignment(Pos.CENTER_RIGHT);
 

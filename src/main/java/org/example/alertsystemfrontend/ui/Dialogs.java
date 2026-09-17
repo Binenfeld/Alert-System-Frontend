@@ -22,6 +22,7 @@ import javafx.stage.Window;
 import org.example.alertsystemfrontend.model.AlertContact;
 import org.example.alertsystemfrontend.model.Comment;
 import org.example.alertsystemfrontend.model.Company;
+import org.example.alertsystemfrontend.model.ImpressionLevel;
 import org.example.alertsystemfrontend.validation.Validation;
 
 import java.util.ArrayList;
@@ -279,8 +280,8 @@ public final class Dialogs {
     private static final class CompanyFieldsForm {
         private final TextField nameField = new TextField();
         private final TextField companyIdField = new TextField();
-        private final ComboBox<String> peopleImpressionCombo = FormFields.impressionCombo();
-        private final ComboBox<String> financialImpressionCombo = FormFields.impressionCombo();
+        private final ComboBox<ImpressionLevel> peopleImpressionCombo = FormFields.impressionCombo();
+        private final ComboBox<ImpressionLevel> financialImpressionCombo = FormFields.impressionCombo();
         private final Label errorLabel = createErrorLabel();
         private final VBox content;
 

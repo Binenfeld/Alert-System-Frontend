@@ -2,12 +2,13 @@ package org.example.alertsystemfrontend.ui;
 
 import javafx.beans.Observable;
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 
 import org.example.alertsystemfrontend.model.AlertContact;
@@ -19,7 +20,6 @@ import org.example.alertsystemfrontend.validation.Validation;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 
 // Bound to alert-system-view.fxml (fx:controller). JavaFX creates one instance of this class
 // with its no-arg constructor when the FXML is loaded, then injects every @FXML field by
@@ -29,10 +29,16 @@ import java.util.concurrent.Callable;
 public class AlertSystemController {
 
     @FXML
-    private ListView<Company> companiesListView;
+    private VBox companiesBox;
 
     @FXML
-    private ListView<AlertContact> alertContactsListView;
+    private Label companiesPlaceholder;
+
+    @FXML
+    private VBox alertContactsBox;
+
+    @FXML
+    private Label alertContactsPlaceholder;
 
     @FXML
     private StackPane loadingOverlay;
@@ -43,13 +49,13 @@ public class AlertSystemController {
     // True from the moment a company/contact is added, removed, or edited, until the next
     // successful send of that list (see onSubmitUpdate, which only calls markClean() on the
     // tracker(s) whose send actually succeeded).
-    private final ChangeTracker<Company> companiesChangeTracker = new ChangeTracker<>(companies, company ->
+    public final ChangeTracker<Company> companiesChangeTracker = new ChangeTracker<>(companies, company ->
             new Observable[]{
                     company.nameProperty(), company.companyIdProperty(),
                     company.peopleImpressionProperty(), company.financialImpressionProperty(),
                     company.unpaidMonthsProperty(), company.getComments()
             });
-    private final ChangeTracker<AlertContact> alertContactsChangeTracker = new ChangeTracker<>(alertContacts,
+    public final ChangeTracker<AlertContact> alertContactsChangeTracker = new ChangeTracker<>(alertContacts,
             contact -> new Observable[]{contact.nameProperty(), contact.emailProperty()});
 
     // Set via setBackendClient() by AlertSystemApplication, which owns the single persistent
@@ -58,13 +64,29 @@ public class AlertSystemController {
 
     @FXML
     public void initialize() {
-        companiesListView.setItems(companies);
-        companiesListView.setCellFactory(list -> new CompanyListCell());
-        companiesListView.setPlaceholder(new Label("אין חברות. לחצו על \"הוסף\" כדי להוסיף חברה."));
+        companies.addListener((ListChangeListener<Company>) change -> refreshCompaniesBox());
+        alertContacts.addListener((ListChangeListener<AlertContact>) change -> refreshAlertContactsBox());
+        refreshCompaniesBox();
+        refreshAlertContactsBox();
+    }
 
-        alertContactsListView.setItems(alertContacts);
-        alertContactsListView.setCellFactory(list -> new AlertContactListCell());
-        alertContactsListView.setPlaceholder(new Label("אין אנשי קשר להתראה. לחצו על \"הוסף\" כדי להוסיף."));
+    private void refreshCompaniesBox() {
+        companiesBox.getChildren().clear();
+        for (Company company : companies) {
+            companiesBox.getChildren().add(
+                    CompanyRowFactory.buildRow(company, companies, () -> companiesBox.getScene().getWindow()));
+        }
+        companiesPlaceholder.setVisible(companies.isEmpty());
+        companiesPlaceholder.setManaged(companies.isEmpty());
+    }
+
+    private void refreshAlertContactsBox() {
+        alertContactsBox.getChildren().clear();
+        for (AlertContact contact : alertContacts) {
+            alertContactsBox.getChildren().add(AlertContactRowFactory.buildRow(contact, alertContacts));
+        }
+        alertContactsPlaceholder.setVisible(alertContacts.isEmpty());
+        alertContactsPlaceholder.setManaged(alertContacts.isEmpty());
     }
 
     public void setBackendClient(BackendClient backendClient) {
@@ -82,28 +104,30 @@ public class AlertSystemController {
 
     @FXML
     private void onAddCompany() {
-        Window owner = companiesListView.getScene().getWindow();
+        Window owner = companiesBox.getScene().getWindow();
         Dialogs.showAddCompanyDialog(owner).ifPresent(companies::add);
     }
 
     @FXML
     private void onAddAlertContact() {
-        Window owner = alertContactsListView.getScene().getWindow();
+        Window owner = alertContactsBox.getScene().getWindow();
         Dialogs.showAddAlertContactDialog(owner).ifPresent(alertContacts::add);
     }
 
     @FXML
     private void onRunHistoricalCheck() {
-        Window owner = companiesListView.getScene().getWindow();
+        Window owner = companiesBox.getScene().getWindow();
         Dialogs.showHistoricalCheckDialog(owner).ifPresent(company ->
-                sendWithLoading(owner, () -> backendClient.sendHistoricalCheckRequest(company),
-                        "בקשת הבדיקה ההיסטורית נשלחה בהצלחה לשרת.",
-                        "שליחת הבקשה לשרת נכשלה. נסה שוב מאוחר יותר."));
+                sendFireAndForget(() -> backendClient.sendHistoricalCheckRequest(company)));
     }
 
+    // Tells the backend what changed and moves on -- it never waits for or shows any outcome from
+    // the backend (the alert contacts are the ones told whether it succeeded, by email, from the
+    // backend side). A list's tracker is only marked clean once its send didn't throw, so a failed
+    // send is retried the next time the user presses submit.
     @FXML
     private void onSubmitUpdate() {
-        Window owner = companiesListView.getScene().getWindow();
+        Window owner = companiesBox.getScene().getWindow();
         List<String> errors = validateAll();
         if (!errors.isEmpty()) {
             Dialogs.showValidationErrors(owner, errors);
@@ -114,73 +138,52 @@ public class AlertSystemController {
         boolean shouldSendContacts = alertContactsChangeTracker.isChanged();
 
         if (!shouldSendCompanies && !shouldSendContacts) {
-            Dialogs.showResultDialog(owner, true, "אין שינויים חדשים לשליחה.", "");
             return;
         }
 
         showLoading();
 
-        Task<UpdateResult> sendTask = new Task<>() {
+        Task<SendOutcome> sendTask = new Task<>() {
             @Override
-            protected UpdateResult call() {
+            protected SendOutcome call() {
                 boolean companiesOk = true;
                 boolean contactsOk = true;
                 if (shouldSendCompanies) {
                     try {
-                        companiesOk = backendClient.sendCompaniesUpdate(companies);
+                        backendClient.sendCompaniesUpdate(companies);
                     } catch (Exception e) {
                         companiesOk = false;
                     }
                 }
                 if (shouldSendContacts) {
                     try {
-                        contactsOk = backendClient.sendContactsUpdate(alertContacts);
+                        backendClient.sendContactsUpdate(alertContacts);
                     } catch (Exception e) {
                         contactsOk = false;
                     }
                 }
-                return new UpdateResult(shouldSendCompanies, companiesOk, shouldSendContacts, contactsOk);
+                return new SendOutcome(shouldSendCompanies, companiesOk, shouldSendContacts, contactsOk);
             }
         };
         sendTask.setOnSucceeded(e -> {
             hideLoading();
-            UpdateResult result = sendTask.getValue();
-            if (result.companiesAttempted() && result.companiesSucceeded()) {
+            SendOutcome outcome = sendTask.getValue();
+            if (outcome.companiesAttempted() && outcome.companiesOk()) {
                 companiesChangeTracker.markClean();
             }
-            if (result.contactsAttempted() && result.contactsSucceeded()) {
+            if (outcome.contactsAttempted() && outcome.contactsOk()) {
                 alertContactsChangeTracker.markClean();
             }
-            String message = buildUpdateResultMessage(result);
-            Dialogs.showResultDialog(owner, result.isFullSuccess(), message, message);
         });
-        sendTask.setOnFailed(e -> {
-            hideLoading();
-            String message = "שליחת העדכון לשרת נכשלה. נסה שוב מאוחר יותר.";
-            Dialogs.showResultDialog(owner, false, message, message);
-        });
+        sendTask.setOnFailed(e -> hideLoading());
 
         Thread thread = new Thread(sendTask, "submit-update-request");
         thread.setDaemon(true);
         thread.start();
     }
 
-    private String buildUpdateResultMessage(UpdateResult result) {
-        List<String> parts = new ArrayList<>();
-        if (result.companiesAttempted()) {
-            parts.add("חברות: " + (result.companiesSucceeded() ? "נשלחו בהצלחה" : "השליחה נכשלה"));
-        }
-        if (result.contactsAttempted()) {
-            parts.add("אנשי קשר להתראה: " + (result.contactsSucceeded() ? "נשלחו בהצלחה" : "השליחה נכשלה"));
-        }
-        return String.join("\n", parts);
-    }
-
-    private record UpdateResult(boolean companiesAttempted, boolean companiesSucceeded,
-                                 boolean contactsAttempted, boolean contactsSucceeded) {
-        boolean isFullSuccess() {
-            return (!companiesAttempted || companiesSucceeded) && (!contactsAttempted || contactsSucceeded);
-        }
+    private record SendOutcome(boolean companiesAttempted, boolean companiesOk,
+                                boolean contactsAttempted, boolean contactsOk) {
     }
 
     private List<String> validateAll() {
@@ -221,27 +224,33 @@ public class AlertSystemController {
         return errors;
     }
 
-    private void sendWithLoading(Window owner, Callable<Boolean> action, String successMessage, String failureMessage) {
+    // Runs a backend call on a background thread with a loading indicator, but never shows any
+    // outcome from it -- a failure is only logged, since nothing about what the backend did with
+    // the request is the frontend's to display (see BackendClient).
+    private void sendFireAndForget(BackendAction action) {
         showLoading();
 
-        Task<Boolean> sendTask = new Task<>() {
+        Task<Void> sendTask = new Task<>() {
             @Override
-            protected Boolean call() throws Exception {
-                return action.call();
+            protected Void call() throws Exception {
+                action.run();
+                return null;
             }
         };
-        sendTask.setOnSucceeded(e -> {
-            hideLoading();
-            Dialogs.showResultDialog(owner, sendTask.getValue(), successMessage, failureMessage);
-        });
+        sendTask.setOnSucceeded(e -> hideLoading());
         sendTask.setOnFailed(e -> {
             hideLoading();
-            Dialogs.showResultDialog(owner, false, successMessage, failureMessage);
+            System.out.println("backend request failed: " + sendTask.getException());
         });
 
         Thread thread = new Thread(sendTask, "backend-request");
         thread.setDaemon(true);
         thread.start();
+    }
+
+    @FunctionalInterface
+    private interface BackendAction {
+        void run() throws Exception;
     }
 
     private void showLoading() {

@@ -40,7 +40,7 @@ public class AlertSystemApplication extends Application {
         }
 
         FXMLLoader fxmlLoader = new FXMLLoader(AlertSystemApplication.class.getResource("alert-system-view.fxml"));
-        Scene scene = new Scene(fxmlLoader.load(), 480, 760);
+        Scene scene = new Scene(fxmlLoader.load(), 640, 760);
 
         AlertSystemController controller = fxmlLoader.getController();
         controller.setBackendClient(backendClient);

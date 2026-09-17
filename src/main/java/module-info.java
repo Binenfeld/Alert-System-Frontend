@@ -4,6 +4,7 @@ module org.example.alertsystemfrontend {
     requires com.google.gson;
 
     opens org.example.alertsystemfrontend.ui to javafx.fxml;
+    opens org.example.alertsystemfrontend.model to com.google.gson;
 
     exports org.example.alertsystemfrontend;
     exports org.example.alertsystemfrontend.ui;

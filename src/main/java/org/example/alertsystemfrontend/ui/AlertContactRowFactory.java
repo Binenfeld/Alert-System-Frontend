@@ -1,8 +1,8 @@
 package org.example.alertsystemfrontend.ui;
 
+import javafx.collections.ObservableList;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
-import javafx.scene.control.ListCell;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -10,23 +10,21 @@ import javafx.scene.layout.VBox;
 import org.example.alertsystemfrontend.model.AlertContact;
 import org.example.alertsystemfrontend.validation.Validation;
 
-public class AlertContactListCell extends ListCell<AlertContact> {
+// Builds one row for an AlertContact. Plain factory, not a ListCell -- see CompanyRowFactory for
+// why this list is a simple VBox rather than a ListView.
+public final class AlertContactRowFactory {
 
-    @Override
-    protected void updateItem(AlertContact contact, boolean empty) {
-        super.updateItem(contact, empty);
-        setText(null);
-        setGraphic(empty || contact == null ? null : buildRow(contact));
+    private AlertContactRowFactory() {
     }
 
-    private HBox buildRow(AlertContact contact) {
+    public static HBox buildRow(AlertContact contact, ObservableList<AlertContact> alertContacts) {
         HBox row = new HBox(10);
         row.getStyleClass().add("row");
         row.setAlignment(Pos.CENTER_LEFT);
 
         Button deleteBtn = new Button("מחק");
         deleteBtn.getStyleClass().addAll("btn-secondary", "small");
-        deleteBtn.setOnAction(e -> getListView().getItems().remove(contact));
+        deleteBtn.setOnAction(e -> alertContacts.remove(contact));
 
         VBox fields = new VBox(6);
         HBox.setHgrow(fields, Priority.ALWAYS);

@@ -94,6 +94,23 @@
     -fx-text-fill: #1F1F1F;
 }
 
+/* Stoplight coloring, best to worst: green -> yellow-green -> orange -> red. */
+.impression-combo .list-cell.impression-cell-great {
+    -fx-background-color: #A5D6A7;
+}
+
+.impression-combo .list-cell.impression-cell-good {
+    -fx-background-color: #DCEDC8;
+}
+
+.impression-combo .list-cell.impression-cell-okay {
+    -fx-background-color: #FFE0B2;
+}
+
+.impression-combo .list-cell.impression-cell-bad {
+    -fx-background-color: #EF9A9A;
+}
+
 .btn-primary, .btn-secondary {
     -fx-background-color: #E1E1E1;
     -fx-border-color: #ADADAD;
@@ -191,27 +208,39 @@
     -fx-font-weight: bold;
 }
 
-.entry-list {
+/* Companies/contacts are a plain VBox of rows inside a ScrollPane, not a virtualized ListView --
+   these rows never needed selection, and a small VBox has none of ListView's internal
+   virtualization/scrollbar quirks (confirmed one such quirk was corrupting the layout on click,
+   even though the rows always actually fit their column). */
+.entry-scroll, .entry-scroll .viewport {
     -fx-background-color: white;
+}
+
+.entry-scroll {
     -fx-border-color: #ACACAC;
     -fx-border-width: 1;
+}
+
+.entry-list {
+    -fx-background-color: white;
     -fx-padding: 0;
 }
 
-.entry-list .list-cell {
-    -fx-background-color: white;
+.entry-list .row {
     -fx-padding: 6 6;
     -fx-border-color: transparent transparent #E0E0E0 transparent;
     -fx-border-width: 0 0 1 0;
 }
 
-.entry-list .list-cell:filled:selected,
-.entry-list .list-cell:filled:hover {
+.entry-list .row:hover {
     -fx-background-color: #E5F1FB;
 }
 
-.entry-list .list-cell:empty {
-    -fx-border-width: 0;
+.placeholder-label {
+    -fx-text-fill: #6B7280;
+    -fx-font-size: 12px;
+    -fx-padding: 20;
+    -fx-text-alignment: center;
 }
 
 .loading-backdrop {

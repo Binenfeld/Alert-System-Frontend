@@ -3,8 +3,8 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.ProgressIndicator?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.Tab?>
 <?import javafx.scene.control.TabPane?>
@@ -25,7 +25,15 @@
             <Tab text="חברות">
                 <content>
                     <VBox styleClass="card" spacing="12.0">
-                        <ListView fx:id="companiesListView" styleClass="entry-list" VBox.vgrow="ALWAYS"/>
+                        <StackPane VBox.vgrow="ALWAYS">
+                            <ScrollPane styleClass="entry-scroll" fitToWidth="true">
+                                <content>
+                                    <VBox fx:id="companiesBox" styleClass="entry-list"/>
+                                </content>
+                            </ScrollPane>
+                            <Label fx:id="companiesPlaceholder" styleClass="placeholder-label" wrapText="true"
+                                   text="אין חברות. לחצו על &quot;הוסף&quot; כדי להוסיף חברה."/>
+                        </StackPane>
                         <Separator/>
                         <HBox alignment="CENTER_RIGHT">
                             <Button text="הוסף" styleClass="btn-primary" onAction="#onAddCompany"/>
@@ -36,7 +44,15 @@
             <Tab text="אנשי קשר להתראה">
                 <content>
                     <VBox styleClass="card" spacing="12.0">
-                        <ListView fx:id="alertContactsListView" styleClass="entry-list" VBox.vgrow="ALWAYS"/>
+                        <StackPane VBox.vgrow="ALWAYS">
+                            <ScrollPane styleClass="entry-scroll" fitToWidth="true">
+                                <content>
+                                    <VBox fx:id="alertContactsBox" styleClass="entry-list"/>
+                                </content>
+                            </ScrollPane>
+                            <Label fx:id="alertContactsPlaceholder" styleClass="placeholder-label" wrapText="true"
+                                   text="אין אנשי קשר להתראה. לחצו על &quot;הוסף&quot; כדי להוסיף."/>
+                        </StackPane>
                         <Separator/>
                         <HBox alignment="CENTER_RIGHT">
                             <Button text="הוסף" styleClass="btn-primary" onAction="#onAddAlertContact"/>
